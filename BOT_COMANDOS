@@ -1,0 +1,323 @@
+#from venv import logger
+import discord, os, random, requests, asyncio, string
+from discord.ext import commands
+from prueba import get_class
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+bot = commands.Bot(command_prefix='!', intents=intents)
+#'////////////////////////////EVENTOS/////////////////////////////////'
+
+@bot.event
+async def on_ready():
+    print(f'Ha iniciado sesión como {bot.user}')
+    for guild in bot.guilds:
+        for channel in guild.text_channels:
+            if channel.permissions_for(guild.me).send_messages:
+                await channel.send("¡Hola! ¡He despertado!  Para cualquiera ayuda escribe _!info_")
+
+#ESTO SOLO DETECTA LOS COMANDOS QUE NO ESTAN ESPESIFICADOS
+comand_encontrado = False
+
+@bot.event
+async def on_command_error(ctx, error):
+    global comand_encontrado
+    if comand_encontrado is False:
+        if isinstance(error, commands.CommandNotFound):
+           # await ctx.send("___Comando no encontrado___")
+            embed = discord.Embed(
+            title="___Comando no encontrado___",
+            description= "Usa ``_!ayuda_`` para ver la lista de comandos.",
+            color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+    else:
+        comand_encontrado = False
+
+#SI EL USUARIO DICE UNO DE LOS "SALUDOS" QUE SE ENCUENTRAN EN LA LISTA "saludos_permitidos":
+saludos_permitidos = ["saludo","saludar","saludos", "buenos dias" ,"buenas tardes","buenas noches","buenas", "hola", "Hola", "hello","Hello","hi", "Hi"]
+
+@bot.event
+async def on_message(message):
+    global comand_encontrado, propietario
+    if message.content.startswith(bot.command_prefix) and message.content[len(bot.command_prefix):] in saludos_permitidos:
+        ctx = await bot.get_context(message)
+        comand_encontrado = True
+        propietario = "on_message"
+        await ctx.invoke(bot.get_command("saludar"))
+    await bot.process_commands(message)
+
+#'////////////////////////////COMANDOS/////////////////////////////////'
+comandos = [
+    "### Comandos",
+    "``!ayuda`` - Muestra la lista de comandos",
+    "``!saludar`` - Saluda al bot",
+    "``!info`` - Muestra información del bot",
+    "``!mem`` - Envia un meme de programacion al azar!",
+    "``!duck`` - Te gusta los patos? usa este comando para enviarte una imagen de un linto patito",
+    "``!chiste`` - Te enviará un chiste de programación",
+    "``!moneda`` - Lanza la moneda para ver si te sale cara o sello!",
+    "``!loteria`` - Un juego en donde solo puedes ganar y ganar!",
+    "``!dinero`` - Puedes ver la cantidad de dinero que ganaste",
+    "``!cry`` - No llores!",
+]
+
+@bot.command()
+async def ayuda(ctx):
+    await ctx.send("Veo que necesitas ayuda... Aquí te dejare una lista de comandos que puedes usar.")
+    embed = discord.Embed(
+        title="Lista de comandos",
+        description="\n".join(comandos),
+        color=discord.Color.blue(),
+    )
+    await ctx.send(embed=embed)
+#//////////////////////////////////////////
+
+saludos_con_nombre = [
+    "Hola, ``{}``! ¿Cómo estás?",
+    "¡Buen día, ``{}``! ¿Todo bien?",
+    "¡Hola ``{}``! ¿Qué tal tu día?",
+    "¡Hola, ¿Cómo te encuentras? ``{}``?",
+    "¿Cómo va todo, ``{}``?",
+    "¡Encantado ``{}``!",
+    "¡Un gusto encontrarte de nuevo ``{}``!",
+    "¡Me alegra verte ``{}``!",
+]
+
+propietario = "none"
+@bot.command()
+async def saludar(ctx):
+    global comand_encontrado, propietario
+    if comand_encontrado is True and propietario == "on_message":
+        nombre_usuario = ctx.author.name
+        saludo = random.choice(saludos_con_nombre).format(nombre_usuario)
+        await ctx.send(saludo)
+        propietario = "none"
+
+#////////////////////////////////////////////COMANDO "INFO"//////////////////////////////////////////////
+informacion_b = [
+    "•Estoy programado para usar comandos y funciones... por haora mi codigo es sencillo pero eficaz.",
+    "•Tengo la capacidad de crear 'banners' como este.",
+    "•Estoy aprendiendo a usar botones y estilos... no es tan complejo  ^u^",
+    "",
+    "--consulta mi lista de comandos con _!ayuda_ en el chat.--",
+]
+
+@bot.command()
+async def info(ctx):
+    embed = discord.Embed(
+        title="Mis habilidades",
+        description="\n".join(informacion_b),
+        color=discord.Color.purple()
+    )
+    await ctx.send(embed=embed)
+#////////////////////////////////////////////////////////////////
+
+@bot.command()
+async def mem(ctx):
+    img_name = random.choice(os.listdir('kocland/imagess'))
+    with open(f'kocland\imagess/{img_name}', 'rb') as f:
+        picture = discord.File(f)
+    await ctx.send(file=picture)
+
+#//////////////////////////////////////////////////////////////////
+
+@bot.command('duck')
+async def duck(ctx):
+    image_url = get_duck_image_url()
+    await ctx.send(image_url)
+    
+#ENVIA UNA IMAGEN DE UN PATO
+def get_duck_image_url():
+    url = 'https://random-d.uk/api/random'
+    res = requests.get(url)
+    data = res.json()
+    return data['url']
+
+#//////////////////////////////////////////////////////////////////
+@bot.command()
+async def chiste(ctx):
+    url = "https://v2.jokeapi.dev/joke/Programming?lang=es"
+    response = requests.get(url)
+    data = response.json()
+
+    if response.status_code == 200:
+        if data["type"] == "twopart":
+            await ctx.send(data["setup"])
+            await asyncio.sleep(2)
+            await ctx.send(data["delivery"])
+        elif data["type"] == "single":
+            await ctx.send(data["joke"])
+    else:
+        await ctx.send("¡Ups! Parece que algo salió mal. No puedo obtener un chiste en este momento.")
+
+#//////////////////////////////////////////////////////////COMANDO MONEDA
+@bot.command()
+async def moneda(ctx):
+    nombre_usurario = ctx.author.name
+
+    cara_sello = ["Cara","Sello"]
+    eleguir_cara_o_sello = cara_sello[random.randint(0,1)]
+
+    view = Simpleview(user=ctx.author, timeout=50)
+    message = await ctx.send(view=view)
+    view.message = message
+    await view.wait()
+    await view.disable_all_items()
+
+    if view.info is True:
+        await asyncio.sleep(1)
+        await ctx.send("La moneda calló en...     " + "``" +eleguir_cara_o_sello+"``")
+        if view.elec == eleguir_cara_o_sello:
+            await ctx.send("Suertud@!!!")
+        else:
+            await ctx.send("Será para la proxima  """ + nombre_usurario)
+    
+@bot.command()
+async def loteria(ctx):
+
+    if ctx.author.id not in jugadores:
+        jugadores[ctx.author.id] = 0
+
+    # Realizar el sorteo de lotería
+    resultado = random.choice([True, False])
+
+    if resultado:
+        premio = random.randint(100, 1000)
+        jugadores[ctx.author.id] += premio
+        await ctx.send(f"Felicidades, ¡has ganado {premio} monedas en la lotería!")
+        view = lot(user=ctx.author, timeout=50)
+        message = await ctx.send(view=view)
+        view.message = message
+        await view.wait()
+        await view.disable_all_items()
+        
+        if view.mult is True:
+            mult = random.choice([True,False])
+        if mult:
+            jugadores[ctx.author.id] *= 2
+            await ctx.send(f"Felicidades, ¡has multiplicado tu dinero!")
+        else:
+            jugadores[ctx.author.id] -= premio
+            await ctx.send(f"Lo lamento.. Has perido todo el dinero de tu premio")
+    else:
+        await ctx.send("Lo siento, no has ganado en la lotería esta vez.")
+
+
+@bot.command()
+async def dinero(ctx):
+    if ctx.author.id not in jugadores:
+        jugadores[ctx.author.id] = 0
+
+    await ctx.send(f"Tienes {jugadores[ctx.author.id]} monedas.")
+
+
+@bot.command()
+async def cry(ctx):
+    nombre_usuario = ctx.author.name
+    respuesta = ["No llores!"," D,: pq lloras", "No estes triste!!", "😥"]
+    eleguir_respuesta = respuesta[random.randint(0,3)]
+    if eleguir_respuesta != respuesta[3]:
+        await ctx.reply("``"+nombre_usuario+"``" + eleguir_respuesta, mention_author=True)
+    else:
+        await ctx.reply(eleguir_respuesta)
+#////////////////////////////////////////////////////////////////////
+
+@bot.command()
+async def check(ctx):
+    if ctx.message.attachments:
+        for attachment in ctx.message.attachments:
+            file_name = attachment.filename
+            file_url = attachment.url
+            await attachment.save(f"./{file_name}")
+            await ctx.send(get_class(model_path="./keras_model.h5", labels_path="labels.txt", image_path=f"./{file_name}"))
+    else:
+        await ctx.send("Olvidaste subir la imagen :(")
+        
+#'''/////////////////FUNCIONES O CONSTANTES///////////////////////'''
+
+#Botones para el comando "MONEDA"
+class Simpleview(discord.ui.View):
+
+    info : bool = False
+    elec : bool = None
+
+    def __init__(self, user, timeout=50):
+        super().__init__(timeout=timeout)
+        self.user = user
+    
+    async def disable_all_items(self):
+        for item in self.children:
+            item.disabled = True
+        await self.message.edit(view=self)
+
+    async def on_timeout(self) -> None:
+        #await self.message.channel.send("Tiempo Máximo")    #habilitar si quiere que haya un tiempo limite de respuesta
+        await self.disable_all_items()
+
+
+    @discord.ui.button(label="Cara",
+                       style= discord.ButtonStyle.success)
+    async def info(self,interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user: #Compara el autor quien llamo la funcion y el que preciono el boton...
+            await interaction.response.send_message("No puedes interactuar con este botón.", ephemeral=True)
+            return
+        await interaction.response.send_message("Tu elección: ``Cara``    \n_-lanzando moneda-_ 🪙") # type: ignore
+        self.info = True
+        self.elec = "Cara"
+        self.stop()
+
+    
+    @discord.ui.button(label="Sello",
+                       style= discord.ButtonStyle.red)
+    async def sello(self,interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("No puedes interactuar con este botón.", ephemeral=True)
+            return
+        await interaction.response.send_message("Tu elección: ``Sello``   \n_-lanzando moneda-_ 🪙") # type: ignore
+        self.info = True
+        self.elec = "Sello"
+        self.stop()
+
+
+#Botones para comando "LOTERIA"
+class lot(discord.ui.View):
+    mult : bool = None
+
+    def __init__(self, user, timeout=50):
+        super().__init__(timeout=timeout)
+        self.user = user
+    
+    async def disable_all_items(self):
+        for item in self.children:
+            item.disabled = True
+        await self.message.edit(view=self)
+
+    async def on_timeout(self) -> None:
+        #await self.message.channel.send("Tiempo Máximo")
+        await self.disable_all_items()
+
+    @discord.ui.button(label="Intentar Multiplicar 50% chance",
+                       style= discord.ButtonStyle.success)
+    async def multiplicando(self,interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("No puedes interactuar con este botón.", ephemeral=True)
+            return
+        await interaction.response.send_message("Al multiplicar hay posibilidad de perder tu recompenza!!!") # type: ignore
+        self.mult = True
+        self.stop()
+
+    @discord.ui.button(label="No gracias",
+                       style= discord.ButtonStyle.red)
+    async def Rechazando(self,interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.user:
+            await interaction.response.send_message("No puedes interactuar con este botón.", ephemeral=True)
+            return
+        await interaction.response.send_message("Rechazado...") # type: ignore
+        self.mult = False
+        self.stop()
+
+jugadores = {}
+
+bot.run("TOKEN")
